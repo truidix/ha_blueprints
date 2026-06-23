@@ -1,0 +1,134 @@
+blueprint:
+  name: Motion Light with Cover Override
+  description: >
+    Turns a light on when motion is detected and lux is below the threshold,
+    or when a roller shutter (optional) is closed.
+    Turns off automatically after a configurable delay once motion clears —
+    regardless of how the light was originally switched on.
+  domain: automation
+  input:
+    motion_trigger:
+      name: Presence / Motion Sensor
+      description: Binary sensor that detects presence or motion.
+      selector:
+        entity:
+          domain: binary_sensor
+
+    light_switch:
+      name: Light or Switch
+      description: The light or switch to control.
+      selector:
+        entity:
+          domain:
+            - light
+            - switch
+
+    time_delay:
+      name: Turn-off delay (minutes)
+      description: How long after motion clears before the light turns off.
+      default: 4.5
+      selector:
+        number:
+          min: 0.5
+          max: 60
+          step: 0.5
+          unit_of_measurement: min
+          mode: slider
+
+    ambient_light_sensor:
+      name: Illuminance Sensor
+      description: Sensor used to measure ambient light level.
+      selector:
+        entity:
+          domain: sensor
+          device_class: illuminance
+
+    ambient_light_value:
+      name: Illuminance Threshold (lux)
+      description: Light turns on only when lux is below this value.
+      default: 68
+      selector:
+        number:
+          min: 1
+          max: 2000
+          step: 1
+          unit_of_measurement: lx
+          mode: box
+
+    cover_entity:
+      name: Roller Shutter (optional)
+      description: >
+        When this cover is closed the light turns on regardless of illuminance.
+        Leave empty to disable.
+      default:
+      selector:
+        entity:
+          domain: cover
+
+    enable_toggle:
+      name: Enable / Disable Toggle (optional)
+      description: >
+        Input boolean to enable or disable the turn-on logic.
+        Leave empty to always run.
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+
+variables:
+  cover_entity: !input cover_entity
+  enable_toggle: !input enable_toggle
+  time_delay: !input time_delay
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "on"
+    id: motion_on
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "off"
+    id: motion_off
+
+conditions: []
+
+actions:
+  - choose:
+      # ── Turn ON ──────────────────────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: motion_on
+          - condition: template
+            value_template: >
+              {{ enable_toggle in ('', none) or is_state(enable_toggle, 'on') }}
+          - condition: or
+            conditions:
+              - condition: numeric_state
+                entity_id: !input ambient_light_sensor
+                below: !input ambient_light_value
+              - condition: template
+                value_template: >
+                  {{ cover_entity not in ('', none) and is_state(cover_entity, 'closed') }}
+        sequence:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input light_switch
+
+      # ── Turn OFF after delay ──────────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: motion_off
+          - condition: state
+            entity_id: !input light_switch
+            state: "on"
+        sequence:
+          - delay:
+              seconds: "{{ (time_delay * 60) | round(0) | int }}"
+          - condition: state
+            entity_id: !input motion_trigger
+            state: "off"
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+mode: restart
