@@ -1,0 +1,116 @@
+blueprint:
+  name: Room Light — Door + Presence
+  description: >
+    Turns a light on when the door opens or motion is detected.
+    Door closes → light off immediately (motion state is ignored).
+    Motion clears → light off after a configurable delay, regardless of door state.
+    Contact sensor is optional: without it the light runs on motion only.
+  domain: automation
+  input:
+    motion_trigger:
+      name: Presence / Motion Sensor
+      description: Binary sensor that detects presence or motion.
+      selector:
+        entity:
+          domain: binary_sensor
+
+    light_switch:
+      name: Light or Switch
+      description: The light or switch to control.
+      selector:
+        entity:
+          domain:
+            - light
+            - switch
+
+    time_delay:
+      name: Turn-off delay (minutes)
+      description: How long after motion clears before the light turns off.
+      default: 2
+      selector:
+        number:
+          min: 0.5
+          max: 30
+          step: 0.5
+          unit_of_measurement: min
+          mode: slider
+
+    contact_sensor:
+      name: Door / Contact Sensor (optional)
+      description: >
+        Door opens → light on immediately.
+        Door closes → light off immediately (motion state is ignored).
+        Leave empty to use motion only.
+      default:
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class:
+            - door
+            - window
+            - opening
+
+variables:
+  time_delay: !input time_delay
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "on"
+    id: motion_on
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "off"
+    id: motion_off
+  - trigger: state
+    entity_id: !input contact_sensor
+    to: "on"
+    id: door_open
+  - trigger: state
+    entity_id: !input contact_sensor
+    to: "off"
+    id: door_close
+
+conditions: []
+
+actions:
+  - choose:
+
+      # ── Turn ON ────────────────────────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id:
+              - motion_on
+              - door_open
+        sequence:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input light_switch
+
+      # ── Door closes → off immediately ──────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: door_close
+        sequence:
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+      # ── Motion clears → off after delay ────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: motion_off
+          - condition: state
+            entity_id: !input light_switch
+            state: "on"
+        sequence:
+          - delay:
+              seconds: "{{ (time_delay * 60) | round(0) | int }}"
+          - condition: state
+            entity_id: !input motion_trigger
+            state: "off"
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+mode: restart
