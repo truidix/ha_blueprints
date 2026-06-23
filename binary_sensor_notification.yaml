@@ -1,0 +1,215 @@
+blueprint:
+  name: Binary Sensor Reminder (mobil + Media)
+  description: >
+    Überwacht einen Binary Sensor und sendet Benachrichtigungen beim Öffnen/Schließen.
+    Bleibt der Sensor länger als 30 Sekunden offen, wird alle 10 Sekunden erneut
+    benachrichtigt, solange offen. Mobile- und MediaPlayer-Notify können über
+    je einen boolschen Schalter deaktiviert werden.
+  domain: automation
+  input:
+    sensor_entity:
+      name: Zu überwachender Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+
+    bool_mobile_enabled:
+      name: Bool für Mobile-Benachrichtigung
+      description: Wenn dieser boolsche Sensor AN ist, werden mobile Notifications gesendet.
+      selector:
+        entity:
+          domain:
+            - input_boolean
+            - binary_sensor
+
+    bool_media_enabled:
+      name: Bool für MediaPlayer-Benachrichtigung
+      description: Wenn dieser boolsche Sensor AN ist, werden MediaPlayer-Notifications gesendet.
+      selector:
+        entity:
+          domain:
+            - input_boolean
+            - binary_sensor
+
+    notify_device:
+      name: Mobiles Endgerät
+      description: Zielgerät für Companion-App Push (optional).
+      default: []
+      selector:
+        device:
+          integration: mobile_app
+
+    open_title:
+      name: Titel bei "offen"
+      default: Sensor offen
+    open_message:
+      name: Nachricht bei "offen"
+      default: >-
+        {{ state_attr(sensor_entity, 'friendly_name') or sensor_entity }} ist geöffnet.
+
+    close_title:
+      name: Titel bei "geschlossen"
+      default: Sensor geschlossen
+    close_message:
+      name: Nachricht bei "geschlossen"
+      default: >-
+        {{ state_attr(sensor_entity, 'friendly_name') or sensor_entity }} ist geschlossen.
+
+    media_action_open:
+      name: MediaPlayer-Aktion bei "offen"
+      description: Hier Aktionen hinzufügen (z.B. TTS auf Lautsprecher).
+      default: []
+      selector:
+        action: {}
+
+    media_action_close:
+      name: MediaPlayer-Aktion bei "geschlossen"
+      description: Hier Aktionen hinzufügen (z.B. TTS auf Lautsprecher).
+      default: []
+      selector:
+        action: {}
+
+    media_action_reminder:
+      name: MediaPlayer-Aktion für Wiederholungen
+      description: Wird alle 10 Sekunden ausgeführt, solange offen.
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+
+variables:
+  sensor_entity: !input sensor_entity
+  bool_mobile_enabled: !input bool_mobile_enabled
+  bool_media_enabled: !input bool_media_enabled
+  notify_device: !input notify_device
+
+  open_title: !input open_title
+  open_message: !input open_message
+  close_title: !input close_title
+  close_message: !input close_message
+
+  media_action_open: !input media_action_open
+  media_action_close: !input media_action_close
+  media_action_reminder: !input media_action_reminder
+
+trigger:
+  - id: sensor_open
+    platform: state
+    entity_id: !input sensor_entity
+    to: "on"
+
+  - id: sensor_close
+    platform: state
+    entity_id: !input sensor_entity
+    to: "off"
+
+condition: []
+
+action:
+  - choose:
+      # Branch: Sensor wurde geöffnet
+      - conditions:
+          - condition: trigger
+            id: sensor_open
+        sequence:
+          # Sofortige Notifications "offen"
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input bool_mobile_enabled
+                    state: "on"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ notify_device is not none and notify_device != [] }}"
+                    then:
+                      - service: "notify.mobile_app_{{ device_attr(notify_device, 'name') | slugify }}"
+                        data:
+                          title: "{{ open_title }}"
+                          message: "{{ open_message }}"
+            default: []
+
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input bool_media_enabled
+                    state: "on"
+                sequence: !input media_action_open
+            default: []
+
+          # Wiederholende Notifications nach 30s, dann alle 10s, solange offen
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input sensor_entity
+                to: "on"
+                for: "00:00:30"
+
+          # Prüfen, ob noch offen
+          - condition: state
+            entity_id: !input sensor_entity
+            state: "on"
+
+          - repeat:
+              while:
+                - condition: state
+                  entity_id: !input sensor_entity
+                  state: "on"
+              sequence:
+                # Mobile Reminder
+                - choose:
+                    - conditions:
+                        - condition: state
+                          entity_id: !input bool_mobile_enabled
+                          state: "on"
+                      sequence:
+                        - if:
+                            - condition: template
+                              value_template: "{{ notify_device is not none and notify_device != [] }}"
+                          then:
+                            - service: "notify.mobile_app_{{ device_attr(notify_device, 'name') | slugify }}"
+                              data:
+                                title: "{{ open_title }}"
+                                message: "{{ open_message }} (Erinnerung)"
+                  default: []
+
+                # Media Reminder
+                - choose:
+                    - conditions:
+                        - condition: state
+                          entity_id: !input bool_media_enabled
+                          state: "on"
+                      sequence: !input media_action_reminder
+                  default: []
+
+                - delay: "00:00:10"
+
+      # Branch: Sensor wurde geschlossen
+      - conditions:
+          - condition: trigger
+            id: sensor_close
+        sequence:
+          # Einmalige "geschlossen"-Benachrichtigung
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input bool_mobile_enabled
+                    state: "on"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ notify_device is not none and notify_device != [] }}"
+                    then:
+                      - service: "notify.mobile_app_{{ device_attr(notify_device, 'name') | slugify }}"
+                        data:
+                          title: "{{ close_title }}"
+                          message: "{{ close_message }}"
+            default: []
+
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input bool_media_enabled
+                    state: "on"
+                sequence: !input media_action_close
+            default: []
