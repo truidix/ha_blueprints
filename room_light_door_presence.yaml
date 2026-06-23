@@ -24,15 +24,15 @@ blueprint:
             - switch
 
     time_delay:
-      name: Turn-off delay (minutes)
+      name: Turn-off delay (seconds)
       description: How long after motion clears before the light turns off.
-      default: 2
+      default: 120
       selector:
         number:
-          min: 0.5
-          max: 30
-          step: 0.5
-          unit_of_measurement: min
+          min: 10
+          max: 1800
+          step: 5
+          unit_of_measurement: s
           mode: slider
 
     contact_sensor:
@@ -105,7 +105,7 @@ actions:
             state: "on"
         sequence:
           - delay:
-              seconds: "{{ (time_delay * 60) | round(0) | int }}"
+              seconds: "{{ time_delay | int }}"
           - condition: state
             entity_id: !input motion_trigger
             state: "off"
