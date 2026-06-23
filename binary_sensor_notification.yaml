@@ -97,11 +97,13 @@ trigger:
   - id: sensor_open
     platform: state
     entity_id: !input sensor_entity
+    from: "off"
     to: "on"
 
   - id: sensor_close
     platform: state
     entity_id: !input sensor_entity
+    from: "on"
     to: "off"
 
 condition: []
