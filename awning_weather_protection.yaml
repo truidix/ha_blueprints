@@ -1,0 +1,96 @@
+blueprint:
+  name: Markise bei Unwetter einfahren
+  description: >
+    Fährt eine Markise automatisch ein, wenn Wind oder Regen einen konfigurierbaren
+    Grenzwert überschreitet. Reagiert nur, wenn die Markise ausgefahren und verfügbar ist.
+    Ein optionaler Schalter kann die Automatik deaktivieren.
+  domain: automation
+  input:
+    awning_entity:
+      name: Markise
+      description: Die zu steuernde Markise
+      selector:
+        entity:
+          domain: cover
+
+    wind_sensor:
+      name: Windsensor
+      description: Sensor für die Windgeschwindigkeit
+      default: sensor.windgeschwindigkeit
+      selector:
+        entity:
+          domain: sensor
+          device_class: wind_speed
+
+    wind_threshold:
+      name: Windgrenzwert (km/h)
+      description: Ab dieser Windgeschwindigkeit wird die Markise eingefahren
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: km/h
+
+    rain_sensor:
+      name: Regensensor
+      description: Sensor für die aktuelle Regenmenge (mm/h)
+      default: sensor.regen_menge_der_jetzigen_stunde
+      selector:
+        entity:
+          domain: sensor
+
+    rain_threshold:
+      name: Regengrenzwert (mm)
+      description: Ab dieser Regenmenge wird die Markise eingefahren
+      default: 0.5
+      selector:
+        number:
+          min: 0.0
+          max: 10.0
+          step: 0.1
+          unit_of_measurement: mm
+
+    enable_toggle:
+      name: Aktivierungs-Schalter (optional)
+      description: Wenn dieser Schalter ausgeschaltet ist, wird die Automatik deaktiviert
+      default:
+      selector:
+        entity:
+          domain:
+            - input_boolean
+            - binary_sensor
+
+variables:
+  enable_toggle: !input enable_toggle
+
+mode: single
+
+trigger:
+  - id: wind_high
+    platform: numeric_state
+    entity_id: !input wind_sensor
+    above: !input wind_threshold
+
+  - id: rain_detected
+    platform: numeric_state
+    entity_id: !input rain_sensor
+    above: !input rain_threshold
+
+condition:
+  - condition: template
+    value_template: "{{ enable_toggle in ('', none) or is_state(enable_toggle, 'on') }}"
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: !input awning_entity
+        state:
+          - closed
+          - closing
+          - unavailable
+
+action:
+  - action: cover.close_cover
+    target:
+      entity_id: !input awning_entity
