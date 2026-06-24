@@ -41,10 +41,13 @@ blueprint:
     mobile_notify_target:
       name: Smartphone-Benachrichtigung
       description: >
-        Notify-Dienst oder Gruppe für Smartphone-Benachrichtigungen.
+        Notify-Entitäten für Smartphone-Benachrichtigungen.
+        Einzelne Geräte oder eine Notify-Gruppe (muss als Helper angelegt sein).
+      default: []
       selector:
         entity:
           domain: notify
+          multiple: true
 
     tts_enabled:
       name: TTS aktivieren
@@ -80,6 +83,7 @@ variables:
   robot_message_prefix: !input robot_message_prefix
   dock_error_sensor: !input dock_error_sensor
   dock_message_prefix: !input dock_message_prefix
+  mobile_notify_target: !input mobile_notify_target
   tts_enabled: !input tts_enabled
   tts_device_type: !input tts_device_type
   tts_toggle: !input tts_toggle
@@ -105,11 +109,15 @@ conditions:
          and trigger.from_state.state != 'unavailable' }}
 
 actions:
-  - action: notify.send_message
-    target:
-      entity_id: !input mobile_notify_target
-    data:
-      message: "{{ full_message }}"
+  - if:
+      - condition: template
+        value_template: "{{ (mobile_notify_target | default([])) | length > 0 }}"
+    then:
+      - action: notify.send_message
+        target:
+          entity_id: !input mobile_notify_target
+        data:
+          message: "{{ full_message }}"
 
   - action: persistent_notification.create
     data:
