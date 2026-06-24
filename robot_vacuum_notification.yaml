@@ -44,7 +44,8 @@ blueprint:
         Notify-Entität oder -Gruppe für Smartphone-Benachrichtigungen,
         z.B. notify.ipad_von_david
       selector:
-        entity: {}
+        entity:
+          domain: notify
 
     tts_enabled:
       name: TTS aktivieren
