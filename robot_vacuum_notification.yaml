@@ -41,12 +41,10 @@ blueprint:
     mobile_notify_target:
       name: Smartphone-Benachrichtigung
       description: >
-        Notify-Entitäten für Smartphone-Benachrichtigungen.
-        Einzelne Geräte oder eine Notify-Gruppe (muss als Helper angelegt sein).
+        Notify-Entität oder -Gruppe für Smartphone-Benachrichtigungen,
+        z.B. notify.ipad_von_david
       selector:
-        target:
-          entity:
-            domain: notify
+        entity: {}
 
     tts_enabled:
       name: TTS aktivieren
@@ -108,7 +106,8 @@ conditions:
 
 actions:
   - action: notify.send_message
-    target: !input mobile_notify_target
+    target:
+      entity_id: !input mobile_notify_target
     data:
       message: "{{ full_message }}"
 
