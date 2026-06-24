@@ -43,7 +43,6 @@ blueprint:
       description: >
         Notify-Entitäten für Smartphone-Benachrichtigungen.
         Einzelne Geräte oder eine Notify-Gruppe (muss als Helper angelegt sein).
-      default: []
       selector:
         entity:
           domain: notify
@@ -109,15 +108,11 @@ conditions:
          and trigger.from_state.state != 'unavailable' }}
 
 actions:
-  - if:
-      - condition: template
-        value_template: "{{ (mobile_notify_target | default([])) | length > 0 }}"
-    then:
-      - action: notify.send_message
-        target:
-          entity_id: !input mobile_notify_target
-        data:
-          message: "{{ full_message }}"
+  - action: notify.send_message
+    target:
+      entity_id: !input mobile_notify_target
+    data:
+      message: "{{ full_message }}"
 
   - action: persistent_notification.create
     data:
