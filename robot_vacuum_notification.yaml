@@ -41,11 +41,10 @@ blueprint:
     mobile_notify_target:
       name: Smartphone-Benachrichtigung
       description: >
-        Name des notify-Dienstes für Smartphone-Benachrichtigungen (ohne "notify." Präfix).
-        Beispiel: household_mobile_phones  oder  mobile_app_mein_handy
-      default: household_mobile_phones
+        Notify-Dienst oder Gruppe für Smartphone-Benachrichtigungen.
       selector:
-        text: {}
+        entity:
+          domain: notify
 
     tts_enabled:
       name: TTS aktivieren
@@ -71,7 +70,7 @@ blueprint:
       description: >
         Input Boolean der TTS global ein-/ausschalten kann.
         Leer lassen = immer sprechen (sofern TTS aktiviert ist).
-      default: []
+      default: input_boolean.banchrtichtigungen_aktiv
       selector:
         entity:
           domain: input_boolean
@@ -81,7 +80,6 @@ variables:
   robot_message_prefix: !input robot_message_prefix
   dock_error_sensor: !input dock_error_sensor
   dock_message_prefix: !input dock_message_prefix
-  mobile_notify_target: !input mobile_notify_target
   tts_enabled: !input tts_enabled
   tts_device_type: !input tts_device_type
   tts_toggle: !input tts_toggle
@@ -107,7 +105,9 @@ conditions:
          and trigger.from_state.state != 'unavailable' }}
 
 actions:
-  - action: "notify.{{ mobile_notify_target }}"
+  - action: notify.send_message
+    target:
+      entity_id: !input mobile_notify_target
     data:
       message: "{{ full_message }}"
 
