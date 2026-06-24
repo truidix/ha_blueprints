@@ -1,0 +1,174 @@
+blueprint:
+  name: Smart Motion Light
+  description: >
+    Turns a light on when motion is detected or a door opens.
+    Optionally requires lux to be below a threshold — a closed roller shutter
+    overrides the lux check. Door closes → light off immediately.
+    Motion clears → light off after a configurable delay.
+    All condition inputs (lux, door, cover, toggle) are optional.
+  domain: automation
+  input:
+    motion_trigger:
+      name: Presence / Motion Sensor
+      description: Binary sensor that detects presence or motion.
+      selector:
+        entity:
+          domain: binary_sensor
+
+    light_switch:
+      name: Light or Switch
+      description: The light or switch to control.
+      selector:
+        entity:
+          domain:
+            - light
+            - switch
+
+    time_delay:
+      name: Turn-off delay (seconds)
+      description: How long after motion clears before the light turns off.
+      default: 120
+      selector:
+        number:
+          min: 5
+          max: 3600
+          step: 5
+          unit_of_measurement: s
+          mode: slider
+
+    ambient_light_sensor:
+      name: Illuminance Sensor (optional)
+      description: >
+        If set, the light only turns on when lux is below the threshold
+        (unless the roller shutter overrides it). Leave empty to ignore lux.
+      default:
+      selector:
+        entity:
+          domain: sensor
+          device_class: illuminance
+
+    ambient_light_value:
+      name: Illuminance Threshold (lux)
+      description: Light turns on only when lux is below this value.
+      default: 68
+      selector:
+        number:
+          min: 1
+          max: 2000
+          step: 1
+          unit_of_measurement: lx
+          mode: box
+
+    contact_sensor:
+      name: Door / Contact Sensor (optional)
+      description: >
+        Door opens → light on immediately.
+        Door closes → light off immediately (motion state is ignored).
+        Leave empty to use motion only.
+      default:
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class:
+            - door
+            - window
+            - opening
+
+    cover_entity:
+      name: Roller Shutter (optional)
+      description: >
+        When this cover is closed the light turns on regardless of illuminance.
+        Leave empty to disable.
+      default:
+      selector:
+        entity:
+          domain: cover
+
+    enable_toggle:
+      name: Enable / Disable Toggle (optional)
+      description: >
+        Input boolean to enable or disable the automation.
+        Leave empty to always run.
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+
+variables:
+  ambient_light_sensor: !input ambient_light_sensor
+  ambient_light_value: !input ambient_light_value
+  cover_entity: !input cover_entity
+  enable_toggle: !input enable_toggle
+  time_delay: !input time_delay
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "on"
+    id: motion_on
+  - trigger: state
+    entity_id: !input motion_trigger
+    to: "off"
+    id: motion_off
+  - trigger: state
+    entity_id: !input contact_sensor
+    to: "on"
+    id: door_open
+  - trigger: state
+    entity_id: !input contact_sensor
+    to: "off"
+    id: door_close
+
+conditions: []
+
+actions:
+  - choose:
+
+      # ── Turn ON (motion or door open) ─────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id:
+              - motion_on
+              - door_open
+          - condition: template
+            value_template: >
+              {{ enable_toggle in ('', none) or is_state(enable_toggle, 'on') }}
+          - condition: template
+            value_template: >
+              {{
+                ambient_light_sensor in ('', none)
+                or states(ambient_light_sensor) | float(ambient_light_value + 1) < ambient_light_value
+                or (cover_entity not in ('', none) and is_state(cover_entity, 'closed'))
+              }}
+        sequence:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input light_switch
+
+      # ── Door closes → off immediately ────────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: door_close
+        sequence:
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+      # ── Motion clears → off after delay ──────────────────────────────────────
+      - conditions:
+          - condition: trigger
+            id: motion_off
+          - condition: state
+            entity_id: !input light_switch
+            state: "on"
+        sequence:
+          - delay:
+              seconds: "{{ time_delay | int }}"
+          - condition: state
+            entity_id: !input motion_trigger
+            state: "off"
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+mode: restart
