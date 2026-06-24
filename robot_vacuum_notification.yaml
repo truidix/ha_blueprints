@@ -4,7 +4,7 @@ blueprint:
     Watches both the robot error sensor and the dock error sensor.
     Skips "unavailable" transitions (e.g. after HA restart) and "none" states
     on the robot sensor. Sends a mobile notification, a persistent notification,
-    and optionally a TTS announcement via the ESPHome speaker.
+    and optionally a TTS announcement.
   domain: automation
   input:
     robot_error_sensor:
@@ -38,11 +38,26 @@ blueprint:
       selector:
         text: {}
 
+    mobile_notify_target:
+      name: Smartphone-Benachrichtigung
+      description: >
+        Name des notify-Dienstes für Smartphone-Benachrichtigungen (ohne "notify." Präfix).
+        Beispiel: household_mobile_phones  oder  mobile_app_mein_handy
+      default: household_mobile_phones
+      selector:
+        text: {}
+
+    tts_enabled:
+      name: TTS aktivieren
+      description: Soll eine Sprachansage ausgegeben werden?
+      default: true
+      selector:
+        boolean: {}
+
     tts_device_type:
       name: TTS-Gerätetyp
       description: >
-        Where to play the TTS announcement.
-        cast = ESPHome speaker only, alexa = Echo devices only, both = all devices.
+        cast = ESPHome-Lautsprecher, alexa = Echo-Geräte, both = alle.
       default: cast
       selector:
         select:
@@ -52,11 +67,11 @@ blueprint:
             - both
 
     tts_toggle:
-      name: TTS-Freigabe (optional)
+      name: TTS-Freigabe-Schalter (optional)
       description: >
-        Input boolean that enables TTS announcements.
-        Leave empty to always speak.
-      default: input_boolean.banchrtichtigungen_aktiv
+        Input Boolean der TTS global ein-/ausschalten kann.
+        Leer lassen = immer sprechen (sofern TTS aktiviert ist).
+      default: []
       selector:
         entity:
           domain: input_boolean
@@ -66,6 +81,8 @@ variables:
   robot_message_prefix: !input robot_message_prefix
   dock_error_sensor: !input dock_error_sensor
   dock_message_prefix: !input dock_message_prefix
+  mobile_notify_target: !input mobile_notify_target
+  tts_enabled: !input tts_enabled
   tts_device_type: !input tts_device_type
   tts_toggle: !input tts_toggle
   triggered_sensor: >
@@ -90,7 +107,7 @@ conditions:
          and trigger.from_state.state != 'unavailable' }}
 
 actions:
-  - action: notify.household_mobile_phones
+  - action: "notify.{{ mobile_notify_target }}"
     data:
       message: "{{ full_message }}"
 
@@ -101,7 +118,9 @@ actions:
   - if:
       - condition: template
         value_template: >
-          {{ tts_toggle in ('', none) or is_state(tts_toggle, 'on') }}
+          {{ tts_enabled
+             and (tts_toggle in ('', none, [])
+                  or is_state(tts_toggle, 'on')) }}
     then:
       - action: script.tts_announce_with_resume
         data:
