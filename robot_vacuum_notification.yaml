@@ -38,6 +38,19 @@ blueprint:
       selector:
         text: {}
 
+    tts_device_type:
+      name: TTS-Gerätetyp
+      description: >
+        Where to play the TTS announcement.
+        cast = ESPHome speaker only, alexa = Echo devices only, both = all devices.
+      default: cast
+      selector:
+        select:
+          options:
+            - cast
+            - alexa
+            - both
+
     tts_toggle:
       name: TTS-Freigabe (optional)
       description: >
@@ -53,6 +66,7 @@ variables:
   robot_message_prefix: !input robot_message_prefix
   dock_error_sensor: !input dock_error_sensor
   dock_message_prefix: !input dock_message_prefix
+  tts_device_type: !input tts_device_type
   tts_toggle: !input tts_toggle
   triggered_sensor: >
     {{ robot_error_sensor if trigger.id == 'robot' else dock_error_sensor }}
@@ -93,6 +107,6 @@ actions:
         data:
           message: "{{ full_message }}"
           language: de
-          device_type: cast
+          device_type: "{{ tts_device_type }}"
 
 mode: single
