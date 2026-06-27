@@ -84,7 +84,7 @@ blueprint:
 
     rolladen_position:
       name: Rolladenposition bei Unwetter (%)
-      description: Auf diese Position wird die Rollade gefahren, wenn die Tür geschlossen ist (Standard: 20 %).
+      description: "Auf diese Position wird die Rollade gefahren, wenn die Tür geschlossen ist (Standard: 20 %)."
       default: 20
       selector:
         number:
