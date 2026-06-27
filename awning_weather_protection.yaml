@@ -62,8 +62,40 @@ blueprint:
             - input_boolean
             - binary_sensor
 
+    door_sensor:
+      name: Türsensor (optional)
+      description: >
+        Kontaktsensor der Tür neben der Markise. Ist die Tür geschlossen (Sensor = off),
+        wird die Rollade auf die konfigurierte Position gefahren. Bei offenem Sensor,
+        unavailable oder nicht gesetzt bleibt die Rollade unverändert.
+      default:
+      selector:
+        entity:
+          domain: binary_sensor
+
+    rolladen_entity:
+      name: Rollade (optional)
+      description: Rollade, die bei geschlossener Tür auf die eingestellte Position gefahren wird.
+      default:
+      selector:
+        entity:
+          domain: cover
+
+    rolladen_position:
+      name: Rolladenposition bei Unwetter (%)
+      description: Auf diese Position wird die Rollade gefahren, wenn die Tür geschlossen ist (Standard: 20 %).
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+
 variables:
   enable_toggle: !input enable_toggle
+  door_sensor: !input door_sensor
+  rolladen_entity: !input rolladen_entity
 
 mode: single
 
@@ -94,3 +126,16 @@ action:
   - action: cover.close_cover
     target:
       entity_id: !input awning_entity
+  - if:
+      - condition: template
+        value_template: >
+          {{ door_sensor not in ('', none)
+             and rolladen_entity not in ('', none)
+             and states(door_sensor) not in ('unavailable', 'unknown')
+             and is_state(door_sensor, 'off') }}
+    then:
+      - action: cover.set_cover_position
+        target:
+          entity_id: "{{ rolladen_entity }}"
+        data:
+          position: !input rolladen_position
