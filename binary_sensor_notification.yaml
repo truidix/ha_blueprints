@@ -1,5 +1,6 @@
 blueprint:
   name: Binary Sensor Reminder (mobil + Media)
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/binary_sensor_notification.yaml
   description: >
     Überwacht einen Binary Sensor und sendet Benachrichtigungen beim Öffnen/Schließen.
     Bleibt der Sensor länger als 30 Sekunden offen, wird alle 10 Sekunden erneut

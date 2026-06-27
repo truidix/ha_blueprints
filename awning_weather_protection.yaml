@@ -1,5 +1,6 @@
 blueprint:
   name: Markise bei Unwetter einfahren
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/awning_weather_protection.yaml
   description: >
     Fährt eine Markise automatisch ein, wenn Wind oder Regen einen konfigurierbaren
     Grenzwert überschreitet. Reagiert nur, wenn die Markise ausgefahren und verfügbar ist.

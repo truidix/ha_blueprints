@@ -1,5 +1,6 @@
 blueprint:
   name: Robot Vacuum Notification
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/robot_vacuum_notification.yaml
   description: >
     Watches both the robot error sensor and the dock error sensor.
     Skips "unavailable" transitions (e.g. after HA restart) and "none" states

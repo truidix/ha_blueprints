@@ -1,5 +1,6 @@
 blueprint:
   name: Motion Light with Cover Override
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/motion_light_with_cover.yaml
   description: >
     Turns a light on when motion is detected and lux is below the threshold,
     or when a roller shutter (optional) is closed.

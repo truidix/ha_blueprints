@@ -1,5 +1,6 @@
 blueprint:
   name: Smart Motion Light
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/smart_motion_light.yaml
   description: >
     Turns a light on when motion is detected or a door opens.
     Optionally requires lux to be below a threshold — a closed roller shutter

@@ -1,5 +1,6 @@
 blueprint:
   name: Room Light — Door + Presence
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/room_light_door_presence.yaml
   description: >
     Turns a light on when the door opens or motion is detected.
     Door closes → light off immediately (motion state is ignored).
