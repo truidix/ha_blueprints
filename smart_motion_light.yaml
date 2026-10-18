@@ -8,6 +8,8 @@ blueprint:
     Motion clears → light off after a configurable delay.
     Optionally also turns off a light that was switched on (e.g. manually)
     when no motion is detected for the turn-off delay.
+    Optional extra motion sensors turn the light on whenever one of them
+    detects new motion, even while the main sensor/group is still "on".
     All condition inputs (lux, door, cover, toggle) are optional.
   domain: automation
   input:
@@ -98,6 +100,21 @@ blueprint:
         entity:
           domain: input_boolean
 
+    extra_motion_sensors:
+      name: Extra motion sensors for switching on (optional)
+      description: >
+        Each new motion on one of these sensors switches the light on (same
+        lux/cover/toggle conditions), even while the main motion sensor is
+        already "on" — e.g. the individual members of a sensor group, so a
+        sensor stuck on "occupied" cannot block switching on again after the
+        light was turned off manually. Switching off still follows the main
+        motion sensor only, so these sensors should be part of it (group).
+      default: []
+      selector:
+        entity:
+          domain: binary_sensor
+          multiple: true
+
     manual_off:
       name: Turn off manually switched-on light (optional)
       description: >
@@ -119,6 +136,10 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input motion_trigger
+    to: "on"
+    id: motion_on
+  - trigger: state
+    entity_id: !input extra_motion_sensors
     to: "on"
     id: motion_on
   - trigger: state
