@@ -1,0 +1,99 @@
+blueprint:
+  name: Closet Light from Door Sensor with Motion Sensor
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/door_and_motion_for_light1.yaml
+  description: >
+    Automatically activate a light with a door sensor attached to the door,
+    activating a smart switch or light. The light will turn off at the end of
+    a timer, or when you close the door. If motion is detected while the light
+    is on, the timer is reset and restarts. Logic also handles manual light
+    toggling while door is open or automation already run.
+  domain: automation
+  input:
+    door_sensor:
+      name: Door Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          multiple: false
+    light_switch:
+      name: Light
+      selector:
+        target:
+          entity:
+            domain:
+              - light
+              - switch
+    motion_sensor:
+      name: Motion Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          multiple: false
+    light_timeout:
+      name: Light Timeout
+      description: How long to let the light run with the door open or motion detected.
+      default: 300
+      selector:
+        number:
+          min: 0
+          max: 86400
+          unit_of_measurement: seconds
+          mode: slider
+          step: 60
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+    id: door-open
+  - platform: state
+    entity_id: !input door_sensor
+    from: "on"
+    to: "off"
+    id: door-closed
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "off"
+    to: "on"
+    id: motion-detected
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: door-open
+        sequence:
+          - service: homeassistant.turn_on
+            target: !input light_switch
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input door_sensor
+                from: "on"
+                to: "off"
+              - platform: state
+                entity_id: !input motion_sensor
+                from: "on"
+                to: "off"
+            timeout: !input light_timeout
+
+      - conditions:
+          - condition: trigger
+            id: motion-detected
+          - condition: state
+            entity_id: !input light_switch
+            state: "on"
+        sequence:
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input motion_sensor
+                from: "on"
+                to: "off"
+            timeout: !input light_timeout
+
+    default:
+      - service: homeassistant.turn_off
+        target: !input light_switch

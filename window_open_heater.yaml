@@ -1,0 +1,72 @@
+blueprint:
+  name: Fenster geöffnet Heizung aus und Szene speichern/wiederherstellen
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/window_open_heater.yaml
+  description: Schaltet das Thermostat aus, wenn Fenster geöffnet wird, speichert Zustand in einer Szene, stellt ihn nach Schließen des Fensters wieder her.
+  domain: automation
+  input:
+    fenster_sensor:
+      name: Fenstersensor
+      description: Entity-ID des Fenster-Kontaktsensors (binary_sensor)
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    thermostat:
+      name: Heizkörper-Thermostat
+      description: Entity-ID des Thermostats (climate)
+      selector:
+        entity:
+          filter:
+            domain: climate
+    switch_heizperiode:
+      name: Heizperiode-Switch
+      description: Entity-ID für die Heizperiode (input_boolean)
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    szene_name:
+      name: Szenen-Name
+      description: Name zum Speichern/Wiederherstellen der Szene
+      selector:
+        text: {}
+
+variables:
+  temp_name: '{{ this.entity_id | replace("_", "")| replace(".", "") }}'
+trigger:
+  - trigger: state
+    entity_id: !input fenster_sensor
+    to: "on"
+
+condition:
+  - condition: state
+    entity_id: !input switch_heizperiode
+    state: "on"
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: !input thermostat
+        state: "off"
+
+action:
+  - action: scene.create
+    data:
+      scene_id: "{{ temp_name }}"
+      snapshot_entities: !input thermostat
+  - action: climate.set_hvac_mode
+    target:
+      entity_id: !input thermostat
+    data:
+      hvac_mode: "off"
+  - wait_for_trigger:
+      - trigger: state
+        entity_id: !input fenster_sensor
+        to: "off"
+  - action: scene.turn_on
+    target:
+      entity_id: "scene.{{ temp_name }}"
+  - action: scene.delete
+    metadata: {}
+    data: {}
+    target:
+      entity_id: "scene.{{ temp_name }}"

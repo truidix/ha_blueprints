@@ -1,0 +1,34 @@
+blueprint:
+  name: Rolladen Stop bei Endlage (dynamische Auswahl)
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/cover_stop_dynamic.yaml
+  description: >
+    Sendet automatisch 'Stop', sobald einer der auswählbaren Covers den Zustand 'open' oder 'closed' erreicht.
+    Ideal für Rolläden, bei denen der Schalter nach Endlage direkt auf einen neuen Befehl reagieren soll.
+  domain: automation
+  input:
+    covers:
+      name: Rolläden (beliebig viele auswählbar)
+      description: Wähle hier alle Rolladen-Entitäten aus, für die diese Logik gelten soll.
+      selector:
+        entity:
+          domain: cover
+          multiple: true
+
+trigger:
+  - platform: state
+    entity_id: !input covers
+    to:
+      - open
+      - closed
+    for:
+      seconds: 2
+
+condition: []
+
+action:
+  - service: cover.stop_cover
+    target:
+      entity_id: "{{ trigger.entity_id }}"
+
+mode: parallel
+max: 20

@@ -1,0 +1,94 @@
+blueprint:
+  name: Stop cover on open/close (12 Covers)
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/cover_stop.yaml
+  description: >
+    Überwacht bis zu 12 optionale Cover. Sobald eines den Zustand
+    "open" oder "closed" erreicht, wird cover.stop_cover auf genau
+    diesem Cover ausgeführt.
+  domain: automation
+  input:
+    cover_1:
+      name: Cover 1
+      selector:
+        entity:
+          domain: cover
+    cover_2:
+      name: Cover 2
+      selector:
+        entity:
+          domain: cover
+    cover_3:
+      name: Cover 3
+      selector:
+        entity:
+          domain: cover
+    cover_4:
+      name: Cover 4
+      selector:
+        entity:
+          domain: cover
+    cover_5:
+      name: Cover 5
+      selector:
+        entity:
+          domain: cover
+    cover_6:
+      name: Cover 6
+      selector:
+        entity:
+          domain: cover
+    cover_7:
+      name: Cover 7
+      selector:
+        entity:
+          domain: cover
+    cover_8:
+      name: Cover 8
+      selector:
+        entity:
+          domain: cover
+    cover_9:
+      name: Cover 9
+      selector:
+        entity:
+          domain: cover
+    cover_10:
+      name: Cover 10
+      selector:
+        entity:
+          domain: cover
+    cover_11:
+      name: Cover 11
+      selector:
+        entity:
+          domain: cover
+    cover_12:
+      name: Cover 12
+      selector:
+        entity:
+          domain: cover
+
+mode: queued
+max: 50
+
+trigger:
+  - platform: state
+    to: ["open", "closed"]
+    entity_id:
+      - !input cover_1
+      - !input cover_2
+      - !input cover_3
+      - !input cover_4
+      - !input cover_5
+      - !input cover_6
+      - !input cover_7
+      - !input cover_8
+      - !input cover_9
+      - !input cover_10
+      - !input cover_11
+      - !input cover_12
+
+action:
+  - service: cover.stop_cover
+    target:
+      entity_id: "{{ trigger.entity_id }}"

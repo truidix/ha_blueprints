@@ -1,0 +1,72 @@
+blueprint:
+  name: Rollladen  Auto-Stop bei 0% / 100%
+  description: >
+    Stoppt einen Rollladen automatisch, wenn er 0 % oder 100 % erreicht
+    und diese Position mindestens 5 Sekunden gehalten wird.
+    Der Blueprint ist pro Cover-Entity instanziierbar und kollisionsfrei
+    mit parallelen Instanzen.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/cover_stop_simple.yaml
+  author: "Perplexity Assistant"
+
+  input:
+    target_cover:
+      name: Rollladen
+      description: Der zu überwachende Rollladen (cover-Entity)
+      selector:
+        entity:
+          domain: cover
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  # 1) Zustandsänderung des Covers beobachten
+  - platform: state
+    entity_id: !input target_cover
+
+variables:
+  target_cover: !input target_cover
+
+condition: []
+
+action:
+  - choose:
+      # Wenn das Cover jetzt bei 0 % oder 100 % steht,
+      # wird geprüft, ob es diese Position 5 s lang hält.
+      - conditions:
+          - condition: or
+            conditions:
+              # Variante 1: position-Attribut vorhanden
+              - condition: template
+                value_template: >
+                  {{ state_attr(target_cover, 'current_position') in [0, 100] }}
+              # Variante 2: nur state verfügbar (open/closed)
+              - condition: template
+                value_template: >
+                  {% set pos = state_attr(target_cover, 'current_position') %}
+                  {% if pos is not none %}
+                    {{ false }}
+                  {% else %}
+                    {{ states(target_cover) in ['open', 'closed'] }}
+                  {% endif %}
+        sequence:
+          # 5 Sekunden „stabil“ auf 0 % oder 100 %
+          - wait_for_trigger:
+              - platform: template
+                value_template: >
+                  {% set pos = state_attr(target_cover, 'current_position') %}
+                  {% if pos is not none %}
+                    {{ pos in [0, 100] }}
+                  {% else %}
+                    {{ states(target_cover) in ['open', 'closed'] }}
+                  {% endif %}
+            timeout: "00:00:15"
+            continue_on_timeout: false
+
+          # Wenn das Cover die 5 Sekunden durchgehalten hat,
+          # STOP nur an genau dieses Cover senden.
+          - service: cover.stop_cover
+            target:
+              entity_id: "{{ target_cover }}"
+    default: []

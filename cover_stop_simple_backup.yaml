@@ -1,0 +1,47 @@
+blueprint:
+  name: Cover Stop nach Dauer
+  source_url: https://raw.githubusercontent.com/truidix/ha_blueprints/main/cover_stop_simple_backup.yaml
+  description: >
+    Stoppt ein Cover, wenn es seit einer konfigurierbaren Zeit vollständig
+    geöffnet oder geschlossen ist.
+  domain: automation
+  input:
+    target_cover:
+      name: Cover
+      description: Das Cover, das überwacht und ggf. gestoppt werden soll.
+      selector:
+        entity:
+          domain: cover
+    duration:
+      name: Dauer bis zum Stop in Sekunden
+      description: Zeit, die das Cover im Zielzustand sein muss, bevor stop_cover ausgeführt wird.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 24
+          unit_of_measurement: seconds
+          mode: slider
+
+trigger:
+  - trigger: state
+    entity_id: !input target_cover
+    to: "closed"
+    for:
+      hours: !input duration
+  - trigger: state
+    entity_id: !input target_cover
+    to: "open"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: !input duration
+
+condition: []
+
+action:
+  - action: cover.stop_cover
+    target:
+      entity_id: !input target_cover
+
+mode: single
