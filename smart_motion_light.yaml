@@ -6,6 +6,8 @@ blueprint:
     Optionally requires lux to be below a threshold — a closed roller shutter
     overrides the lux check. Door closes → light off immediately.
     Motion clears → light off after a configurable delay.
+    Optionally also turns off a light that was switched on (e.g. manually)
+    when no motion is detected for the turn-off delay.
     All condition inputs (lux, door, cover, toggle) are optional.
   domain: automation
   input:
@@ -96,12 +98,23 @@ blueprint:
         entity:
           domain: input_boolean
 
+    manual_off:
+      name: Turn off manually switched-on light (optional)
+      description: >
+        If enabled, the light is also turned off when it has been on for the
+        turn-off delay and the motion sensor has reported no motion for that
+        long — e.g. after it was switched on manually and nobody walked by.
+      default: false
+      selector:
+        boolean: {}
+
 variables:
   ambient_light_sensor: !input ambient_light_sensor
   ambient_light_value: !input ambient_light_value
   cover_entity: !input cover_entity
   enable_toggle: !input enable_toggle
   time_delay: !input time_delay
+  manual_off: !input manual_off
 
 triggers:
   - trigger: state
@@ -120,8 +133,30 @@ triggers:
     entity_id: !input contact_sensor
     to: "off"
     id: door_close
+  - trigger: state
+    entity_id: !input light_switch
+    to: "on"
+    for:
+      seconds: !input time_delay
+    id: light_on_idle
 
-conditions: []
+# light_on_idle only starts a run when it will actually switch off, so it
+# never restarts (and cancels) a running motion_off delay.
+conditions:
+  - condition: or
+    conditions:
+      - condition: not
+        conditions:
+          - condition: trigger
+            id: light_on_idle
+      - condition: and
+        conditions:
+          - "{{ manual_off }}"
+          - condition: state
+            entity_id: !input motion_trigger
+            state: "off"
+            for:
+              seconds: !input time_delay
 
 actions:
   - choose:
@@ -169,6 +204,15 @@ actions:
           - condition: state
             entity_id: !input motion_trigger
             state: "off"
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input light_switch
+
+      # ── Light on without motion (manual_off) → off ───────────────────────────
+      - conditions:
+          - condition: trigger
+            id: light_on_idle
+        sequence:
           - action: homeassistant.turn_off
             target:
               entity_id: !input light_switch
