@@ -10,6 +10,8 @@ blueprint:
     when no motion is detected for the turn-off delay.
     Optional extra motion sensors turn the light on whenever one of them
     detects new motion, even while the main sensor/group is still "on".
+    Optional "sensors that may get stuck" are ignored for switching off once
+    they have reported motion for a configurable time without any change.
     All condition inputs (lux, door, cover, toggle) are optional.
   domain: automation
   input:
@@ -115,6 +117,37 @@ blueprint:
           domain: binary_sensor
           multiple: true
 
+    stuck_sensors:
+      name: Sensors that may get stuck (optional)
+      description: >
+        Sensors listed here are ignored for switching off once they have shown
+        motion for the stuck timeout without any change (e.g. a battery sensor
+        that dropped off the network while showing "occupied"). They still
+        switch the light on. The light then goes off when all other sensors
+        (main sensor/group members and extra motion sensors) have reported no
+        motion for the turn-off delay. Only list sensors whose "on" does not
+        legitimately last that long — never mmWave presence sensors. Leave
+        empty to keep the normal behaviour.
+      default: []
+      selector:
+        entity:
+          domain: binary_sensor
+          multiple: true
+
+    stuck_timeout:
+      name: Stuck timeout (minutes)
+      description: >
+        After how many minutes of unchanged "motion" a sensor from the list
+        above counts as stuck.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 240
+          step: 1
+          unit_of_measurement: min
+          mode: box
+
     manual_off:
       name: Turn off manually switched-on light (optional)
       description: >
@@ -132,6 +165,10 @@ variables:
   enable_toggle: !input enable_toggle
   time_delay: !input time_delay
   manual_off: !input manual_off
+  motion_entity: !input motion_trigger
+  extra_sensors: !input extra_motion_sensors
+  stuck_sensors: !input stuck_sensors
+  stuck_timeout: !input stuck_timeout
 
 triggers:
   - trigger: state
@@ -146,6 +183,18 @@ triggers:
     entity_id: !input motion_trigger
     to: "off"
     id: motion_off
+  # Only used when stuck_sensors is set (see conditions): an extra sensor
+  # clearing, or a listed sensor sitting on "on" for the stuck timeout.
+  - trigger: state
+    entity_id: !input extra_motion_sensors
+    to: "off"
+    id: member_off
+  - trigger: state
+    entity_id: !input stuck_sensors
+    to: "on"
+    for:
+      minutes: !input stuck_timeout
+    id: sensor_stuck
   - trigger: state
     entity_id: !input contact_sensor
     to: "on"
@@ -163,7 +212,18 @@ triggers:
 
 # light_on_idle only starts a run when it will actually switch off, so it
 # never restarts (and cancels) a running motion_off delay.
+# member_off / sensor_stuck only start a run when stuck_sensors is set, so
+# without it the blueprint behaves exactly as before.
 conditions:
+  - condition: or
+    conditions:
+      - condition: not
+        conditions:
+          - condition: trigger
+            id:
+              - member_off
+              - sensor_stuck
+      - "{{ stuck_sensors | count > 0 }}"
   - condition: or
     conditions:
       - condition: not
@@ -213,18 +273,35 @@ actions:
               entity_id: !input light_switch
 
       # ── Motion clears → off after delay ──────────────────────────────────────
+      # Without stuck_sensors: off when the main sensor is still "off".
+      # With stuck_sensors: off when no sensor shows motion, ignoring listed
+      # sensors whose "on" is older than the stuck timeout.
       - conditions:
           - condition: trigger
-            id: motion_off
+            id:
+              - motion_off
+              - member_off
+              - sensor_stuck
           - condition: state
             entity_id: !input light_switch
             state: "on"
         sequence:
           - delay:
               seconds: "{{ time_delay | int }}"
-          - condition: state
-            entity_id: !input motion_trigger
-            state: "off"
+          - condition: template
+            value_template: >
+              {% if stuck_sensors | count == 0 %}
+                {{ is_state(motion_entity, 'off') }}
+              {% else %}
+                {% set members = (expand(motion_entity) | map(attribute='entity_id') | list
+                                  + (extra_sensors | list)) | unique | list %}
+                {% set limit = now() - timedelta(minutes=stuck_timeout | int) %}
+                {% set on = expand(members) | selectattr('state', 'eq', 'on') | list %}
+                {% set real = on | rejectattr('entity_id', 'in', stuck_sensors) | list
+                   + on | selectattr('entity_id', 'in', stuck_sensors)
+                        | selectattr('last_changed', '>', limit) | list %}
+                {{ real | count == 0 }}
+              {% endif %}
           - action: homeassistant.turn_off
             target:
               entity_id: !input light_switch
